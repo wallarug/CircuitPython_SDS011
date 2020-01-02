@@ -59,44 +59,57 @@ class Nova_SDS011:
         self.pm25 = 0
         self.pm10 = 0
         
-        """Check the BME680 was found, read the coefficients and enable the sensor for continuous
-           reads."""
+        # set the initial state of the sensor
+        self.set_sleep(0)
+        
+        # Check device Firmware Version.
+        if self.firmware_ver() != True:
+            raise RuntimeError('Failed to find SDS011!')
+            
+        self.set_working_period(PERIOD_CONTINUOUS)
+        self.set_mode(MODE_QUERY)
         
 
-        # Check device ID.
-        
-        
     def set_sleep(self, value):
         mode = 0 if value else 1
-        self._write(CMD_SLEEP, [0x1, mode])
-        self._read()
+        self.write(CMD_SLEEP, [0x1, mode])
+        self.read()
     
     def set_mode(self, mode=MODE_QUERY):
-        self._write(CMD_MODE, [0x1, mode])
-        self._read()
+        self.write(CMD_MODE, [0x1, mode])
+        self.read()
     
     def set_working_period(self, period):
-        self._write(CMD_WORKING_PERIOD, [0x1, period])
-        self._read()
+        self.write(CMD_WORKING_PERIOD, [0x1, period])
+        self.read()
     
     def firmware_ver(self):
-        self._write(CMD_FIRMWARE)
-        data = self._read()
+        self.write(CMD_FIRMWARE)
+        data = self.read()
         r = struct.unpack('<BBBHBB', d[3:])
         checksum = sum(ord(v) for v in d[2:8])%256
         #TODO:  Return something useful.
-        print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
+        crc = False
+        
+        if checksum = =r[4] and r[5] == 0xab:
+            crc = True
+        else:
+            crc = False
+        
+        #ret = {'Y': r[0], 'M': r[1], 'D': r[2], 'ID': hex(r[3]), 'CRC': crc }
+        return crc
+        #print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
     
     def set_id(self, id):
         id_h = (id>>8) % 256
         id_l = id % 256
         
-        self._write(CMD_DEVICE_ID, [0]*10+[id_l, id_h])
-        self._read()
+        self.write(CMD_DEVICE_ID, [0]*10+[id_l, id_h])
+        self.read()
     
     def query_data(self):
-        self._write(CMD_QUERY_DATA)
-        d = self._read()
+        self.write(CMD_QUERY_DATA)
+        d = self.read()
         
         values = []
         
@@ -111,9 +124,8 @@ class Nova_SDS011:
   
     def dump(self, d, prefix=''):
         print(prefix + ' '.join(x.encode('hex') for x in d))
-        
-    
-    def _write(self, cmd, data=[]):
+          
+    def write(self, cmd, data=[]):
         assert len(data) <= 12
         data += [0,]*(12-len(data))
         checksum = (sum(data)+cmd-2) % 256
@@ -124,20 +136,21 @@ class Nova_SDS011:
         if DEBUG:
             self.dump(ret, '> ')
         
-        # TODO: write to UART port
+        # write transaction to UART port
         self._uart.write(ret)
     
-    def _read(self):
-        # TODO: read from UART port
-        data = self._uart.read()
+    def read(self):
+        # read from UART port until start byte \aa is found.
         byte = 0
         while byte != "\xaa":
-            byte = ser.read(size=1)
+            byte = self._uart.read(1)
 
-        d = ser.read(size=9)
+        # read 9 data bytes from UART port.
+        d = self._uart.read(9)
 
         if DEBUG:
             dump(d, '< ')
+        # return the 10 bytes from the transaction
         return byte + d
             
     
