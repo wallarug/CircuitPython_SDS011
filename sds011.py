@@ -61,26 +61,25 @@ class Nova_SDS011:
         
         """Check the BME680 was found, read the coefficients and enable the sensor for continuous
            reads."""
-        self._write(_BME680_REG_SOFTRESET, [0xB6])
-        time.sleep(0.005)
+        
 
         # Check device ID.
-        chip_id = self._read_byte(_BME680_REG_CHIPID)
         
-    def set_sleep(value):
+        
+    def set_sleep(self, value):
         mode = 0 if value else 1
         self._write(CMD_SLEEP, [0x1, mode])
         self._read()
     
-    def set_mode(mode=MODE_QUERY):
+    def set_mode(self, mode=MODE_QUERY):
         self._write(CMD_MODE, [0x1, mode])
         self._read()
     
-    def set_working_period(period):
+    def set_working_period(self, period):
         self._write(CMD_WORKING_PERIOD, [0x1, period])
         self._read()
     
-    def firmware_ver():
+    def firmware_ver(self):
         self._write(CMD_FIRMWARE)
         data = self._read()
         r = struct.unpack('<BBBHBB', d[3:])
@@ -88,14 +87,14 @@ class Nova_SDS011:
         #TODO:  Return something useful.
         print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
     
-    def set_id(id):
+    def set_id(self, id):
         id_h = (id>>8) % 256
         id_l = id % 256
         
         self._write(CMD_DEVICE_ID, [0]*10+[id_l, id_h])
         self._read()
     
-    def query_data():
+    def query_data(self):
         self._write(CMD_QUERY_DATA)
         d = self._read()
         
@@ -110,11 +109,11 @@ class Nova_SDS011:
             
         return values
   
-    def dump(d, prefix=''):
+    def dump(self, d, prefix=''):
         print(prefix + ' '.join(x.encode('hex') for x in d))
         
     
-    def _write(cmd, data=[]):
+    def _write(self, cmd, data=[]):
         assert len(data) <= 12
         data += [0,]*(12-len(data))
         checksum = (sum(data)+cmd-2) % 256
@@ -128,7 +127,7 @@ class Nova_SDS011:
         # TODO: write to UART port
         self._uart.write(ret)
     
-    def _read():
+    def _read(self):
         # TODO: read from UART port
         data = self._uart.read()
         byte = 0
