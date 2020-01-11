@@ -58,6 +58,25 @@ except ImportError:
 __version__ = "0.0.0-auto.0"
 __repo__ = "https://github.com/robotics-masters/CircuitPython_SDS011.git"
 
+
+_SDS011_HEAD            = b'\xaa'  # message header
+_SDS011_TAIL            = b'\xab'  # message tail
+_SDS011_CMD_ID          = b'\xb4'  # message ID
+
+_SDS011_CMD_READ        = b'\x00'  # commands are either READ or
+_SDS011_CMD_WRITE       = b'\x01'  #  WRITE for the sensor
+_SDS011_CMD_REPORT_MODE = b'\x02'  # set work mode
+_SDS011_CMD_QUERY       = b'\x04'  # get data base
+_SDS011_CMD_SLEEP       = b'\x06'  # sleeps sensor
+_SDS011_CMD_WORK_PERIOD = b'\x08'  # set work period
+
+_SDS011_REPORT_ACTIVE   = b'\x00'  # report - active (continuous)
+_SDS011_REPORT_PASSIVE  = b'\x01'  # report - passive (requested)
+
+_SDS011_SLEEP_SLEEP     = b'\x00'  # sleep - sleep
+_SDS011_SLEEP_WORK      = b'\x01'  # sleep - active/work
+
+
 DEBUG = 0
 CMD_MODE = 2
 CMD_QUERY_DATA = 4
@@ -70,8 +89,10 @@ MODE_QUERY = 1
 PERIOD_CONTINUOUS = 0
 
 
-class Nova_SDS011:
-    """Driver from SDS011 air quality sensor
+
+
+class SDS011:
+    """Driver for Nova SDS011 air quality sensor
        :param int refresh_rate: Maximum number of readings per second. Faster property reads
          will be from the previous reading."""
     def __init__(self, uart, refresh_rate=10):
@@ -80,14 +101,14 @@ class Nova_SDS011:
         self.pm10 = 0
         
         # set the initial state of the sensor
-        self.set_sleep(0)
+        #self.set_sleep(0)
         
         # Check device Firmware Version.
-        if self.firmware_ver() != True:
-            raise RuntimeError('Failed to find SDS011!')
+        #if self.firmware_ver() != True:
+        #    raise RuntimeError('Failed to find SDS011!')
             
-        self.set_working_period(PERIOD_CONTINUOUS)
-        self.set_mode(MODE_QUERY)
+        #self.set_working_period(PERIOD_CONTINUOUS)
+        #self.set_mode(MODE_QUERY)
         
 
     def set_sleep(self, value):
@@ -111,14 +132,14 @@ class Nova_SDS011:
         #TODO:  Return something useful.
         crc = False
         
-        if checksum = =r[4] and r[5] == 0xab:
+        if checksum == r[4] and r[5] == 0xab:
             crc = True
         else:
             crc = False
         
         #ret = {'Y': r[0], 'M': r[1], 'D': r[2], 'ID': hex(r[3]), 'CRC': crc }
+        print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
         return crc
-        #print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
     
     def set_id(self, id):
         id_h = (id>>8) % 256
@@ -143,20 +164,26 @@ class Nova_SDS011:
         return values
   
     def dump(self, d, prefix=''):
+        print("original: ", d)
+        delta = d.encode('hex')
+        print('delta: ', delta)
         print(prefix + ' '.join(x.encode('hex') for x in d))
           
     def write(self, cmd, data=[]):
         assert len(data) <= 12
         data += [0,]*(12-len(data))
         checksum = (sum(data)+cmd-2) % 256
-        ret = "\xaa\xb4" + chr(cmd)
-        ret += ''.join(chr(x) for x in data)
-        ret += "\xff\xff" + chr(checksum) + "\xab"
+        ret = b"\xaa\xb4" + hex(cmd)
+        ret += ''.join(hex(x) for x in data)
+        ret += b"\xff\xff" + hex(checksum) + b"\xab"
         
         if DEBUG:
             self.dump(ret, '> ')
         
         # write transaction to UART port
+        print("transaction: ", ret)
+        print("checksum: ", checksum)
+        print("command: {0} {1}".format(cmd, chr(cmd)))
         self._uart.write(ret)
     
     def read(self):
@@ -164,6 +191,7 @@ class Nova_SDS011:
         byte = 0
         while byte != "\xaa":
             byte = self._uart.read(1)
+            print(byte)
 
         # read 9 data bytes from UART port.
         d = self._uart.read(9)
