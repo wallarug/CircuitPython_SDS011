@@ -90,7 +90,6 @@ PERIOD_CONTINUOUS = 0
 
 
 
-
 class SDS011:
     """Driver for Nova SDS011 air quality sensor
        :param int refresh_rate: Maximum number of readings per second. Faster property reads
@@ -101,7 +100,8 @@ class SDS011:
         self.pm10 = 0
         
         # set the initial state of the sensor
-        #self.set_sleep(0)
+        self.set_sleep(0)
+        self.set_report_mode(
         
         # Check device Firmware Version.
         #if self.firmware_ver() != True:
@@ -109,20 +109,28 @@ class SDS011:
             
         #self.set_working_period(PERIOD_CONTINUOUS)
         #self.set_mode(MODE_QUERY)
-        
 
     def set_sleep(self, value):
-        mode = 0 if value else 1
-        self.write(CMD_SLEEP, [0x1, mode])
-        self.read()
+        """ Set if the sensor is Sleep or Work mode.
+              0: Sleep (default)
+              1: Work
+        """
+        mode = _SDS011_SLEEP_WORK if value else _SDS011_SLEEP_SLEEP
+        self.write(_SDS011_CMD_SLEEP, mode)
     
-    def set_mode(self, mode=MODE_QUERY):
-        self.write(CMD_MODE, [0x1, mode])
-        self.read()
+    def set_mode(self, value):
+        """ Set if the sensor is Active or Passive mode.
+              0: Passive (default)
+              1: Active
+        """
+        mode = _SDS011_REPORT_ACTIVE if value else _SDS011_REPORT_PASSIVE
+        self.write(_SDS011_CMD_REPORT_MODE, mode)
     
     def set_working_period(self, period):
-        self.write(CMD_WORKING_PERIOD, [0x1, period])
-        self.read()
+        """ Set the sensor work period in active mode [0 - 30].
+              0 - 30
+        """
+        self.write(CMD_WORKING_PERIOD, hex(period))
     
     def firmware_ver(self):
         self.write(CMD_FIRMWARE)
@@ -148,43 +156,66 @@ class SDS011:
         self.write(CMD_DEVICE_ID, [0]*10+[id_l, id_h])
         self.read()
     
-    def query_data(self):
-        self.write(CMD_QUERY_DATA)
-        d = self.read()
+    def query(self):
+        """ Helper function for QUERY data """
+        # set header for transfer
+        cmd = _SDS011_HEAD + _SDS011_CMD_ID
+
+        # process all the data for transfer
+        cmd += ( _SDS011_CMD_QUERY + b'\x00' * 12 )
+    
+        # end of data
+        cmd += b'\xff' + b'\xff'
+
+        # checksum and close
+        checksum = sum(d for d in cmd[2:]) % 256
+        cmd += bytes([checksum]) + _SDS011_TAIL
+
+        # send to uart device
+        self._uart.write(cmd)
         
-        values = []
-        
-        if d[1] == "\xc0":
-            r = struct.unpack('<HHxxBB', d[2:])
-            pm25 = r[0]/10.0
-            pm10 = r[1]/10.0
-            checksum = sum(ord(v) for v in d[2:8])%256
-            values = [pm25, pm10]
-            
-        return values
-  
-    def dump(self, d, prefix=''):
-        print("original: ", d)
-        delta = d.encode('hex')
-        print('delta: ', delta)
-        print(prefix + ' '.join(x.encode('hex') for x in d))
-          
-    def write(self, cmd, data=[]):
-        assert len(data) <= 12
-        data += [0,]*(12-len(data))
-        checksum = (sum(data)+cmd-2) % 256
-        ret = b"\xaa\xb4" + hex(cmd)
-        ret += ''.join(hex(x) for x in data)
-        ret += b"\xff\xff" + hex(checksum) + b"\xab"
-        
-        if DEBUG:
-            self.dump(ret, '> ')
-        
-        # write transaction to UART port
-        print("transaction: ", ret)
-        print("checksum: ", checksum)
-        print("command: {0} {1}".format(cmd, chr(cmd)))
-        self._uart.write(ret)
+        # process the data returned
+        raw = self.reply()
+        if raw is None:
+            return None  # TODO
+
+        data = struct.unpack('<HH', raw[2:6])
+        pm25 = data[0] / 10.0
+        pm10 = data[1] / 10.0
+
+        return (pm25, pm10)     
+
+    def write(self, base, mode):
+        """ Helper function for REPORT, SLEEP and PERIOD setting """   
+        # set header for transfer
+        cmd = _SDS011_HEAD + _SDS011_CMD_ID
+
+        # process all the data for transfer
+        cmd += ( base + _SDS011_CMD_WRITE + mode + b'\x00' * 10 )
+
+        # end of data
+        cmd += b'\xff' + b'\xff'
+
+        # checksum and close
+        checksum = sum(d for d in cmd[2:]) % 256
+        cmd += bytes([checksum]) + _SDS011_TAIL
+
+        # send to uart device
+        self._uart.write(cmd)
+
+        # read the response and process as required...
+        self.reply()
+
+    def reply(self):
+        raw = self._uart.read(10)
+        data = raw[2:8]
+        if len(data) == 0:
+            return None
+
+        if len(sum(d for d in data) & 255) != raw[8]:
+            return None #TODO: also check cmd id
+
+        return raw
     
     def read(self):
         # read from UART port until start byte \aa is found.
