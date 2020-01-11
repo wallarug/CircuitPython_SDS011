@@ -101,7 +101,7 @@ class SDS011:
         
         # set the initial state of the sensor
         self.set_sleep(0)
-        self.set_report_mode(
+        self.set_mode(0)
         
         # Check device Firmware Version.
         #if self.firmware_ver() != True:
@@ -130,7 +130,8 @@ class SDS011:
         """ Set the sensor work period in active mode [0 - 30].
               0 - 30
         """
-        self.write(CMD_WORKING_PERIOD, hex(period))
+        assert period >= 0 and period <= 30
+        self.write(CMD_WORKING_PERIOD, bytes([period]))
     
     def firmware_ver(self):
         self.write(CMD_FIRMWARE)
@@ -212,7 +213,7 @@ class SDS011:
         if len(data) == 0:
             return None
 
-        if len(sum(d for d in data) & 255) != raw[8]:
+        if (sum(d for d in data) & 255) != raw[8]:
             return None #TODO: also check cmd id
 
         return raw
