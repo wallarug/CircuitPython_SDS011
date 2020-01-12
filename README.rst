@@ -30,8 +30,7 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-```
-
+```python
 import time
 import board
 import busio
