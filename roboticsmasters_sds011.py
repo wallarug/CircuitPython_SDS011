@@ -77,19 +77,6 @@ _SDS011_SLEEP_SLEEP     = b'\x00'  # sleep - sleep
 _SDS011_SLEEP_WORK      = b'\x01'  # sleep - active/work
 
 
-DEBUG = 0
-CMD_MODE = 2
-CMD_QUERY_DATA = 4
-CMD_DEVICE_ID = 5
-CMD_SLEEP = 6
-CMD_FIRMWARE = 7
-CMD_WORKING_PERIOD = 8
-MODE_ACTIVE = 0
-MODE_QUERY = 1
-PERIOD_CONTINUOUS = 0
-
-
-
 class SDS011:
     """Driver for Nova SDS011 air quality sensor
        :param int refresh_rate: Maximum number of readings per second. Faster property reads
@@ -98,7 +85,7 @@ class SDS011:
         self._uart = uart
         
         # set the initial state of the sensor
-        self.set_sleep(0)
+        self.set_sleep(1)
         self.set_mode(0)
         
         # Check device Firmware Version.
@@ -127,30 +114,6 @@ class SDS011:
         """
         assert period >= 0 and period <= 30
         self.write(CMD_WORKING_PERIOD, bytes([period]))
-    
-    def firmware_ver(self):
-        self.write(CMD_FIRMWARE)
-        data = self.read()
-        r = struct.unpack('<BBBHBB', d[3:])
-        checksum = sum(ord(v) for v in d[2:8])%256
-        #TODO:  Return something useful.
-        crc = False
-        
-        if checksum == r[4] and r[5] == 0xab:
-            crc = True
-        else:
-            crc = False
-        
-        #ret = {'Y': r[0], 'M': r[1], 'D': r[2], 'ID': hex(r[3]), 'CRC': crc }
-        print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
-        return crc
-    
-    def set_id(self, id):
-        id_h = (id>>8) % 256
-        id_l = id % 256
-        
-        self.write(CMD_DEVICE_ID, [0]*10+[id_l, id_h])
-        self.read()
     
     def query(self):
         """ Helper function for QUERY data """
@@ -196,22 +159,14 @@ class SDS011:
         checksum = sum(d for d in cmd[2:]) % 256
         cmd += bytes([checksum]) + _SDS011_TAIL
 
-        print("command: ", cmd)
-
         # send to uart device
         self._uart.write(cmd)
         sleep(0.100)
 
         # read the response and process as required...
-        data = self._uart.read(1)
-        while data is None:
-            data = self._uart.read(1)
-            print(data)
-            sleep(0.100)
         self.reply()
 
     def reply(self):
-
         # wait for reply
         raw = None
 
@@ -226,20 +181,29 @@ class SDS011:
             return None #TODO: also check cmd id
 
         return raw
+
+    def firmware_ver(self):
+        self.write(CMD_FIRMWARE)
+        data = self.read()
+        r = struct.unpack('<BBBHBB', d[3:])
+        checksum = sum(ord(v) for v in d[2:8])%256
+        #TODO:  Return something useful.
+        crc = False
+        
+        if checksum == r[4] and r[5] == 0xab:
+            crc = True
+        else:
+            crc = False
+        
+        #ret = {'Y': r[0], 'M': r[1], 'D': r[2], 'ID': hex(r[3]), 'CRC': crc }
+        print("Y: {}, M: {}, D: {}, ID: {}, CRC={}".format(r[0], r[1], r[2], hex(r[3]), "OK" if (checksum==r[4] and r[5]==0xab) else "NOK"))
+        return crc
     
-    def read(self):
-        # read from UART port until start byte \aa is found.
-        byte = 0
-        while byte != "\xaa":
-            byte = self._uart.read(1)
-            print(byte)
-
-        # read 9 data bytes from UART port.
-        d = self._uart.read(9)
-
-        if DEBUG:
-            dump(d, '< ')
-        # return the 10 bytes from the transaction
-        return byte + d
+    def set_id(self, id):
+        id_h = (id>>8) % 256
+        id_l = id % 256
+        
+        self.write(CMD_DEVICE_ID, [0]*10+[id_l, id_h])
+        self.read()
             
     
