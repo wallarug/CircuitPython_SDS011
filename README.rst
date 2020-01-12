@@ -31,6 +31,7 @@ Usage Example
 =============
 
 ```
+
 import time
 import board
 import busio
