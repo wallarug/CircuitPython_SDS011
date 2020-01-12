@@ -100,15 +100,15 @@ class SDS011:
         self.pm10 = 0
         
         # set the initial state of the sensor
-        self.set_sleep(0)
-        self.set_mode(0)
+        #self.set_sleep(0)
+        #self.set_mode(0)
         
         # Check device Firmware Version.
         #if self.firmware_ver() != True:
         #    raise RuntimeError('Failed to find SDS011!')
             
         #self.set_working_period(PERIOD_CONTINUOUS)
-        #self.set_mode(MODE_QUERY)
+        self.set_mode(0)
 
     def set_sleep(self, value):
         """ Set if the sensor is Sleep or Work mode.
@@ -201,17 +201,31 @@ class SDS011:
         checksum = sum(d for d in cmd[2:]) % 256
         cmd += bytes([checksum]) + _SDS011_TAIL
 
+        print("command: ", cmd)
+
         # send to uart device
         self._uart.write(cmd)
+        sleep(0.100)
 
         # read the response and process as required...
+        data = self._uart.read(1)
+        while data is None:
+            data = self._uart.read(1)
+            print(data)
+            sleep(0.100)
         self.reply()
 
     def reply(self):
-        raw = self._uart.read(10)
-        data = raw[2:8]
-        if len(data) == 0:
-            return None
+
+        # wait for reply
+        raw = None
+
+        while raw is None:
+            raw = self._uart.read(10)
+            sleep(0.001)
+
+        if raw is not None:
+            data = raw[2:8]
 
         if (sum(d for d in data) & 255) != raw[8]:
             return None #TODO: also check cmd id
