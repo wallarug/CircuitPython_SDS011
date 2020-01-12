@@ -96,19 +96,14 @@ class SDS011:
          will be from the previous reading."""
     def __init__(self, uart, refresh_rate=10):
         self._uart = uart
-        self.pm25 = 0
-        self.pm10 = 0
         
         # set the initial state of the sensor
-        #self.set_sleep(0)
-        #self.set_mode(0)
+        self.set_sleep(0)
+        self.set_mode(0)
         
         # Check device Firmware Version.
         #if self.firmware_ver() != True:
         #    raise RuntimeError('Failed to find SDS011!')
-            
-        #self.set_working_period(PERIOD_CONTINUOUS)
-        self.set_mode(0)
 
     def set_sleep(self, value):
         """ Set if the sensor is Sleep or Work mode.
