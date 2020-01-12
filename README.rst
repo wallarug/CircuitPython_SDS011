@@ -30,7 +30,22 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-.. todo:: Add a quick, simple example. It and other examples should live in the examples folder and be included in docs/examples.rst.
+```
+import time
+import board
+import busio
+
+import roboticsmasters_SDS011
+
+uart = busio.UART(board.GROVE_TX, board.GROVE_RX, baudrate=9600)
+
+sensor = roboticsmasters_SDS011.SDS011(uart)
+
+while True:
+    data = sensor.query()
+    print(data)
+    time.sleep(5)
+```
 
 Contributing
 ============
