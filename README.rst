@@ -30,7 +30,8 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-.. code-block:: python
+.. code-block:: python3
+
 import time
 import board
 import busio
@@ -45,7 +46,7 @@ while True:
     data = sensor.query()
     print(data)
     time.sleep(5)
-```
+
 
 Contributing
 ============
