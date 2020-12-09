@@ -30,7 +30,7 @@ This is easily achieved by downloading
 Usage Example
 =============
 
-```python3
+.. code-block:: python
 import time
 import board
 import busio
